@@ -65,12 +65,9 @@ wire_type_map = { "2.4G": Wifi.WIFI_2G,
               help="Log level (default: debug)",
               type=click.Choice(["none", "debug", "info", "error"]),
               default="none")
-@click.option("--sort",
-              help="sort key (default: ip)",
-              type=click.Choice(["mac", "ip", "name", "vendor"]),
-              default="ip")
 
-def main(router, username, password, log_level, sort):
+
+def main(router, username, password, log_level):
     """ main entry point"""
     if log_level == "none":
         logging.disable()
@@ -89,7 +86,6 @@ def main(router, username, password, log_level, sort):
     logging.debug("username: %s", username)
     logging.debug("password: %s", password is not None)
     logging.debug("log-level: %s", log_level)
-    logging.debug("sort: %s", sort)
 
     if password is None:
         logging.info("getting password from keyring")
@@ -144,14 +140,14 @@ def main(router, username, password, log_level, sort):
                         devices[mac].ipaddress,
                         devices[mac].hostname,
                         '',
-                        leases[mac].lease_time)
+                        leases[mac].lease_time if mac in leases else "")
         else:
             device = devices[mac] = ExtendedDevice(wire_type_map[dev.get('wire_type')],
                         macaddress.EUI48(dev.get('mac')),
                         ipaddress.IPv4Address(dev.get('ip')),
                         dev.get('name'),
                         '',
-                        leases[mac].lease_time)
+                        leases[mac].lease_time if mac in leases else "")
         logging.debug("adding device %s to router", device.hostname)
         router_dev.associate(device)
 
@@ -183,14 +179,14 @@ def main(router, username, password, log_level, sort):
                             devices[dev_mac].ipaddress,
                             devices[dev_mac].hostname,
                             '',
-                            leases[dev_mac].lease_time)
+                            leases[dev_mac].lease_time if dev_mac in leases else "")
             else:
                 device = devices[dev_mac] = ExtendedDevice(wire_type_map[dev.get('wire_type')],
                             macaddress.EUI48(dev.get('mac')),
                             ipaddress.IPv4Address(dev.get('ip')),
                             dev.get('name'),
                             '',
-                            leases[dev_mac].lease_time)
+                            leases[dev_mac].lease_time if dev_mac in leases else "")
             logging.debug("adding device %s to mesh device %s",
                           device.hostname, devices[mac].hostname)
             devices[mac].associate(device)
@@ -261,6 +257,10 @@ def main(router, username, password, log_level, sort):
 
         return c
 
+    print(f"{Fore.LIGHTBLUE_EX}Num Wifi   MAC               IP               "\
+          "Hostname                           Model        Vendor                               "\
+          "Lease     Type              dB"\
+          f"{Style.RESET_ALL}")
     print_topology(router_dev, 0, 1, Fore.GREEN)
 
 if __name__ == '__main__':
