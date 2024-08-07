@@ -43,6 +43,11 @@ class ExtendedDevice(Device):
     def associate(self, dev):
         """ associate dev to this device """
         self.associates.append(dev)
+    def set_device_type(self, devtype):
+        if devtype == "other" or devtype == "iot_device":
+            return
+        else:
+            self.device_type = devtype
 
 class RouterDevice(ExtendedDevice):
     """ Class RouterDevice """
@@ -104,6 +109,8 @@ def main(router, username, password, log_level):
 
     logging.debug("getting router status")
     status = router.get_status()
+    logging.debug("status: %s", router.request('admin/status?form=all&operation=read')
+)
 
     devices = {}
     leases = {}
@@ -116,6 +123,8 @@ def main(router, username, password, log_level):
 
     logging.debug("getting mesh topology")
     topology = router.request("/admin/onemesh_network?form=mesh_topology")
+    logging.debug("topology: %s", topology)
+
     router_dev = RouterDevice(Wifi.WIFI_6G if status.wifi_6g_enable \
                               else Wifi.WIFI_5G if status.wifi_5g_enable \
                                 else Wifi.WIFI_2G,
@@ -124,7 +133,7 @@ def main(router, username, password, log_level):
                         topology.get('name'),
                         topology.get('model'),
                         "Permanent")
-    router_dev.device_type = 'router'
+    router_dev.set_device_type(topology.get('device_type'))
     logging.debug("router device is %s", router_dev.hostname)
     if router_dev.macaddress in devices:
         pass
@@ -148,6 +157,7 @@ def main(router, username, password, log_level):
                         dev.get('name'),
                         '',
                         leases[mac].lease_time if mac in leases else "")
+        device.set_device_type(dev.get('device_type'))
         logging.debug("adding device %s to router", device.hostname)
         router_dev.associate(device)
 
@@ -168,7 +178,7 @@ def main(router, username, password, log_level):
                         dev.get('name'),
                         dev.get('model'),
                         "Permanent")
-        device.device_type = 'mesh'
+        device.set_device_type(dev.get('device_type'))
         logging.debug("adding mesh device %s to router", device.hostname)
         router_dev.associate(device)
         for dev in dev.get('mesh_nclient_list'):
@@ -221,7 +231,8 @@ def main(router, username, password, log_level):
             dev.signal_strength = item.get('signal', 0)
             dev.upload_speed = item.get('uploadSpeed', 0)
             dev.download_speed = item.get('downloadSpeed', 0)
-            dev.device_type = item.get('deviceType')
+            logging.debug("changing mac: %s device_type from %s to %s", dev.macaddress, dev.device_type, item.get('deviceType'))
+            dev.set_device_type(item.get('deviceType'))
             logging.debug("mac: %s %s", dev.macaddr, item)
         except KeyError as ex:
             logging.error("KeyError %s %s", mac, ex)
@@ -239,7 +250,7 @@ def main(router, username, password, log_level):
         elif isinstance(dev, MeshDevice):
             color = Fore.LIGHTYELLOW_EX
 
-        print(f"{color}{c:03} " + 2*i*" " + f"{dev.type.name[-2:]:{6-2*i}} "\
+        print(f"{color}{c:03} " + 1*i*" " + f"{dev.type.name[-2:]:{4-1*i}} "\
               f"{dev.macaddress} {dev.ipaddress:16s} {dev.hostname:34} {dev.model:12.12} "\
               f"{dev.vendor:36.36} {dev.lease_time:9.9s} {dev.device_type:16.16} "\
               f"{str(dev.signal_strength):>3.3s}"\
@@ -257,7 +268,7 @@ def main(router, username, password, log_level):
 
         return c
 
-    print(f"{Fore.LIGHTBLUE_EX}Num Wifi   MAC               IP               "\
+    print(f"{Fore.LIGHTBLUE_EX}Num Wifi MAC               IP               "\
           "Hostname                           Model        Vendor                               "\
           "Lease     Type              dB"\
           f"{Style.RESET_ALL}")
