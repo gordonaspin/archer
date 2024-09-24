@@ -58,7 +58,7 @@ class MeshDevice(ExtendedDevice):
 class AbsentDevice(ExtendedDevice):
     """ Class AbsentDevice """
 
-wire_type_map = { "2.4G": Wifi.WIFI_2G,
+connection_type_map = { "2.4G": Wifi.WIFI_2G,
                   "5G": Wifi.WIFI_5G,
                   "6G": Wifi.WIFI_6G }
 
@@ -151,7 +151,10 @@ def main(router, username, password, log_level):
                         '',
                         leases[mac].lease_time if mac in leases else "")
         else:
-            device = devices[mac] = ExtendedDevice(wire_type_map[dev.get('wire_type')],
+            connection_type = connection_type_map[dev.get('connection_type')]
+            if connection_type is None:
+                connection_type = 'Unk'
+            device = devices[mac] = ExtendedDevice(connection_type,
                         macaddress.EUI48(dev.get('mac')),
                         ipaddress.IPv4Address(dev.get('ip')),
                         dev.get('name'),
@@ -191,7 +194,10 @@ def main(router, username, password, log_level):
                             '',
                             leases[dev_mac].lease_time if dev_mac in leases else "")
             else:
-                device = devices[dev_mac] = ExtendedDevice(wire_type_map[dev.get('wire_type')],
+                connection_type = connection_type_map[dev.get('connection_type')]
+                if connection_type is None:
+                    connection_type = 'Unk'
+                device = devices[dev_mac] = ExtendedDevice(connection_type,
                             macaddress.EUI48(dev.get('mac')),
                             ipaddress.IPv4Address(dev.get('ip')),
                             dev.get('name'),
