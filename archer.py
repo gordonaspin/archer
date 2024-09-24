@@ -151,9 +151,10 @@ def main(router, username, password, log_level):
                         '',
                         leases[mac].lease_time if mac in leases else "")
         else:
-            connection_type = connection_type_map[dev.get('connection_type')]
+            connection_type = dev.get('connection_type')
             if connection_type is None:
-                connection_type = 'Unk'
+                connection_type = '2.4G'
+            connection_type = connection_type_map[connection_type]
             device = devices[mac] = ExtendedDevice(connection_type,
                         macaddress.EUI48(dev.get('mac')),
                         ipaddress.IPv4Address(dev.get('ip')),
@@ -194,9 +195,10 @@ def main(router, username, password, log_level):
                             '',
                             leases[dev_mac].lease_time if dev_mac in leases else "")
             else:
-                connection_type = connection_type_map[dev.get('connection_type')]
+                connection_type = dev.get('connection_type')
                 if connection_type is None:
-                    connection_type = 'Unk'
+                    connection_type = '2.4G'
+                connection_type = connection_type_map[connection_type]
                 device = devices[dev_mac] = ExtendedDevice(connection_type,
                             macaddress.EUI48(dev.get('mac')),
                             ipaddress.IPv4Address(dev.get('ip')),
