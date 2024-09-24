@@ -58,9 +58,16 @@ class MeshDevice(ExtendedDevice):
 class AbsentDevice(ExtendedDevice):
     """ Class AbsentDevice """
 
-connection_type_map = { "2.4G": Wifi.WIFI_2G,
+def map_connection_type(type):
+    connection_type_map = { "2.4G": Wifi.WIFI_2G,
                   "5G": Wifi.WIFI_5G,
                   "6G": Wifi.WIFI_6G }
+    
+    if type is None:
+        return Wifi.WIFI_2G
+    
+    connection_type = connection_type_map.get(type)
+    return connection_type
 
 @click.command()
 @click.option("--router",       help="URL of router", default="http://192.168.0.1")
@@ -151,10 +158,7 @@ def main(router, username, password, log_level):
                         '',
                         leases[mac].lease_time if mac in leases else "")
         else:
-            connection_type = dev.get('connection_type')
-            if connection_type is None:
-                connection_type = '2.4G'
-            connection_type = connection_type_map[connection_type]
+            connection_type = map_connection_type(dev.get('connection_type'))
             device = devices[mac] = ExtendedDevice(connection_type,
                         macaddress.EUI48(dev.get('mac')),
                         ipaddress.IPv4Address(dev.get('ip')),
@@ -195,10 +199,7 @@ def main(router, username, password, log_level):
                             '',
                             leases[dev_mac].lease_time if dev_mac in leases else "")
             else:
-                connection_type = dev.get('connection_type')
-                if connection_type is None:
-                    connection_type = '2.4G'
-                connection_type = connection_type_map[connection_type]
+                connection_type = map_connection_type(dev.get('connection_type'))
                 device = devices[dev_mac] = ExtendedDevice(connection_type,
                             macaddress.EUI48(dev.get('mac')),
                             ipaddress.IPv4Address(dev.get('ip')),
