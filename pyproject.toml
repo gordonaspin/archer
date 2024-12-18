@@ -1,0 +1,33 @@
+[project]
+name = "archer"
+version = "1.0.0"
+description = "archer is a command-line tool to interrogate a TP Link router and show the network heirarchy of devices"
+authors = [{ name = "Gordon Aspin", email = "gordon.aspin@gmail.com" }]
+dependencies = [
+    "build",
+    "click",
+    "keyring",
+    "mac_vendor_lookup",
+    "colorama",
+    "tplinkrouterc6u"
+]
+#requires-python = "==3.12.*"
+readme = "README.md"
+license = { text = "MIT" }
+maintainers = [{ name = "Gordon Aspin", email="gordon.aspin@gmail.com" }]
+classifiers=[
+        "Intended Audience :: Developers",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+]
+
+[project.scripts]
+archer = "archer.archer:main"
+
+[project.urls]
+Repository = "https://github.com/gordonaspin/archer"
+
+[tool.setuptools]
+packages = ["archer"]
