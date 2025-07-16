@@ -226,7 +226,7 @@ def main(router, username, password, log_level):
     logging.debug("getting router ipv4 reservations")
     for res in router.get_ipv4_reservations():
         if res.macaddress not in devices:
-            print("%s %s not in devices", res.macaddress, res.hostname)
+            print(f"{res.macaddress} {res.hostname} not in devices")
 
     # Get signal strengths and other info
     logging.debug("getting device signal strenghts and other info")
