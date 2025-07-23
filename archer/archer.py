@@ -116,8 +116,7 @@ def main(router, username, password, log_level):
 
     logging.debug("getting router status")
     status = router.get_status()
-    logging.debug("status: %s", router.request('admin/status?form=all&operation=read')
-)
+    logging.debug("status: %s", router.request('admin/status?form=all&operation=read'))
 
     devices = {}
     leases = {}
