@@ -115,7 +115,8 @@ class ExtendedDevice(Device):
         self.associates = []
     def associate(self, dev):
         """ associate dev to this device """
-        self.associates.append(dev)
+        if dev not in self.associates:
+            self.associates.append(dev)
     def set_device_type(self, devtype):
         if devtype == "other" or devtype == "iot_device":
             return
@@ -182,7 +183,7 @@ def main(router_host, username, password, log_level):
                             TplinkC80Router, TplinkWDRRouter, TplinkRE330Router]:
         router = client(router_host, password, username, logger, True, 30)
         if router.supports():
-            print(f"Router is {client}")
+            logger.info(f"Router is {client}")
 
     router = TplinkRouterProvider.get_client(router_host, password, logger=logger)
     try:
@@ -205,12 +206,17 @@ def main(router_host, username, password, log_level):
     logger.debug(f"status: {status}")
     router_dev = devices[status._lan_macaddr] = RouterDevice(Connection.HOST_6G, status._lan_macaddr, status._lan_ipv4_addr, "router")
     router_dev.model = firmware.model
+    router_dev.lease_time = "Permanent"
+    router_dev.device_type = "Router"
+    logger.info(f"From status, added RouterDevice {router_dev}")
+    
 
     logger.debug(devices)
 
     for dev in status.devices:
         devices[dev.macaddress] = ExtendedDevice(dev.type, dev._macaddr, dev._ipaddr, dev.hostname)
         router_dev.associate(devices[dev.macaddress])
+        logger.info(f"From status, added ExtendedDevice {devices[dev.macaddress]}")
 
     logger.debug(devices)
 
@@ -222,46 +228,47 @@ def main(router_host, username, password, log_level):
     for item in mesh_devices:
         mac = item['mac']
         try:
-            dev = devices[macaddress.EUI48(mac)]
-            dev = MeshDevice(dev.type, dev._macaddr, dev._ipaddr, dev.hostname)
+            old_dev = devices[macaddress.EUI48(mac)]
+            dev = devices[macaddress.EUI48(mac)] = MeshDevice(dev.type, dev._macaddr, dev._ipaddr, dev.hostname)
+            logger.info(f"From mesh devices, changing {old_dev} to MeshDevice {devices[dev.macaddress]}")
         except KeyError as ex:
-            logger.info("found mesh device {item['hostname']}")
-            dev = MeshDevice(Connection.HOST_5G, macaddress.EUI48(mac), ipaddress.ip_address(item['ip']), item['name'])
+            dev = devices[dev.macaddress] = MeshDevice(Connection.HOST_5G, macaddress.EUI48(mac), ipaddress.ip_address(item['ip']), item['name'])
             dev.model = item['model']
-            devices[dev.macaddress] = dev
-            router_dev.associate(dev)
+            logger.info(f"From mesh devices, added {devices[dev.macaddress]}")
         dev.client_num = item['client_num']
         dev.device_type = item['device_type']
         dev.signal_strength = item['signal_strength']
+        router_dev.associate(dev)
     
-    leases = {}
     logger.info("getting dhcp leases")
     ipv4_leases = router.get_ipv4_dhcp_leases()
     logger.debug(ipv4_leases)
-    for lease in ipv4_leases:
-        leases[lease.macaddress] = lease
 
     # Check for devices not currently in topology, but have retained dhcp lease
-    for mac, lease in leases.items():
+    for lease in ipv4_leases:
         try:
-            dev = devices[mac]
+            dev = devices[lease.macaddress]
         except KeyError as ex:
-            dev = devices[mac] = AbsentDevice(Connection.HOST_2G,
-                            mac,
-                            lease.ipaddress,
-                            lease.hostname)
+            dev = devices[lease.macaddress] = AbsentDevice(Connection.HOST_2G, lease.macaddress, lease.ipaddress, lease.hostname)
             router_dev.associate(dev)
-            logger.debug(f"adding disconnected device {dev.hostname} with leased address")
+            logger.info(f"From ipv4 leases, added {devices[dev.macaddress]}")
         dev.lease_time = lease.lease_time
+        dev._ipaddr = lease.ipaddress
 
     logger.debug(devices)
 
     logger.info("getting router ipv4 reservations")
     reservations = router.get_ipv4_reservations()
     logger.debug(reservations)
+
     for res in reservations:
-        if res.macaddress not in devices:
-            print(f"{res.macaddress} {res.hostname} not in devices")
+        try:
+            dev = devices[res.macaddress]
+        except KeyError as ex:
+            dev = devices[dev.macaddress] = ExtendedDevice(Connection.HOST_2G, res.macaddress, res.ipaddress, res.hostname)
+            logger.debug(f"From reservations, added {devices[dev.macaddress]}")
+        dev.lease_time = "Permanent"            
+        router_dev.associate(devices[dev.macaddress])
 
     # Get signal strengths and other info
     logger.info("getting device signal strenghts and other info")
@@ -273,14 +280,24 @@ def main(router_host, username, password, log_level):
         mac = item['mac']
         try:
             dev = devices[macaddress.EUI48(mac)]
-            dev.signal_strength = item.get('signal', 0)
-            dev.upload_speed = item.get('uploadSpeed', 0)
-            dev.download_speed = item.get('downloadSpeed', 0)
-            logger.debug(f"changing mac: {dev.macaddress} device_type from {dev.device_type} to {item.get('deviceType')}")
+            logger.info(f"From game accelerators, changing mac: {dev.macaddress} device_type from {dev.device_type} to {item.get('deviceType')}")
             dev.set_device_type(item.get('deviceType'))
-            logger.debug(f"mac: {dev.macaddr} {item}")
         except KeyError as ex:
-            logger.error(f"KeyError {mac} not found in devices {ex}")
+            match item['deviceTag']:
+                case '2.4G':
+                    device_type = Connection.HOST_2G
+                case '5G':
+                    device_type = Connection.HOST_5G
+                case '6G':
+                    device_type = Connection.HOST_6G
+                case _ :
+                    device_type = Connection.HOST_2G
+                    logger.debug('Assuming Connection.HOST_2G')
+            dev = devices[dev.macaddress] = ExtendedDevice(device_type, macaddress.EUI48(item['mac']), ipaddress.ip_address(item['ip']), item['deviceName'])
+            logger.info(f"From game accelerators, added {devices[dev.macaddress]}")
+        dev.signal_strength = item.get('signal', 0)
+        dev.upload_speed = item.get('uploadSpeed', 0)
+        dev.download_speed = item.get('downloadSpeed', 0)
 
     logger.debug(devices)
 
