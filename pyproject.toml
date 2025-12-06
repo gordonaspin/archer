@@ -24,10 +24,10 @@ classifiers=[
 ]
 
 [project.scripts]
-archer = "archer.archer:main"
+archer = "archer:main"
 
 [project.urls]
 Repository = "https://github.com/gordonaspin/archer"
 
 [tool.setuptools]
-packages = ["archer"]
+#packages = ["archer"]
