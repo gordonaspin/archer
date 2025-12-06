@@ -315,6 +315,7 @@ def main(router_host, username, password, sortkey, log_level):
             router_dev.associate(dev)
             logger.info(f"From ipv4 leases, added {devices[dev.macaddress]}")
         dev.lease_time = lease.lease_time
+        dev.hostname = lease.hostname
         dev._ipaddr = lease.ipaddress
 
     logger.debug(devices)
