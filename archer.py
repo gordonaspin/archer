@@ -269,29 +269,9 @@ def main(router_host, username, password, sortkey, log_level):
                 mac_client = mesh_client['mac']
                 try:
                     old_client_dev = devices[macaddress.EUI48(mac_client)]
-                    match mesh_client['connection_type']:
-                            case '2.4G':
-                                connection_type = Connection.HOST_2G
-                            case '5G':
-                                connection_type = Connection.HOST_5G
-                            case '6G':
-                                connection_type = Connection.HOST_6G
-                            case _ :
-                                connection_type = Connection.HOST_2G
-                                logger.debug('Assuming Connection.HOST_2G')
-                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(connection_type, macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
+                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(map_connection_type(mesh_client['connection_type']), macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
                 except KeyError as ex:
-                    match mesh_client['connection_type']:
-                        case '2.4G':
-                            connection_type = Connection.HOST_2G
-                        case '5G':
-                            connection_type = Connection.HOST_5G
-                        case '6G':
-                            connection_type = Connection.HOST_6G
-                        case _ :
-                            connection_type = Connection.HOST_2G
-                            logger.debug('Assuming Connection.HOST_2G')
-                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(connection_type, macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
+                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(map_connection_type(mesh_client['connection_type']), macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
                     mesh_client_dev.signal_strength = mesh_client['signal_strength']
                     logger.info(f"From mesh sclient detail, added {devices[mesh_client_dev.macaddress]}")
                 mesh_dev.associate(mesh_client_dev)
@@ -346,17 +326,7 @@ def main(router_host, username, password, sortkey, log_level):
             logger.info(f"From game accelerators, changing mac: {dev.macaddress} device_type from {dev.device_type} to {item.get('deviceType')}")
             dev.set_device_type(item.get('deviceType'))
         except KeyError as ex:
-            match item['deviceTag']:
-                case '2.4G':
-                    device_type = Connection.HOST_2G
-                case '5G':
-                    device_type = Connection.HOST_5G
-                case '6G':
-                    device_type = Connection.HOST_6G
-                case _ :
-                    device_type = Connection.HOST_2G
-                    logger.debug('Assuming Connection.HOST_2G')
-            dev = devices[dev.macaddress] = ExtendedDevice(device_type, macaddress.EUI48(item['mac']), ipaddress.ip_address(item['ip']), item['deviceName'])
+            dev = devices[dev.macaddress] = ExtendedDevice(map_connection_type(item['deviceTag']), macaddress.EUI48(item['mac']), ipaddress.ip_address(item['ip']), item['deviceName'])
             logger.info(f"From game accelerators, added {devices[dev.macaddress]}")
         dev.signal_strength = item.get('signal', 0)
         dev.upload_speed = item.get('uploadSpeed', 0)
