@@ -24,7 +24,7 @@ classifiers=[
 ]
 
 [project.scripts]
-archer = "archer:main"
+archer-cli = "archer:main"
 
 [project.urls]
 Repository = "https://github.com/gordonaspin/archer"
