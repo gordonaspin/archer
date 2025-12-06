@@ -326,6 +326,8 @@ def main(router_host, username, password, sortkey, log_level):
             f"{Style.RESET_ALL}")
 
     print_topology(router_dev, sortkey, 0, 1, Fore.GREEN)
+    router.logout()
+
 
 if __name__ == '__main__':
     main() #pylint: disable=no-value-for-parameter
