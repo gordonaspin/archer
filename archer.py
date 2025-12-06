@@ -70,14 +70,20 @@ def setup_logger(log_level) -> None:
 def print_topology(dev, sortkey, indent, count, color):
     i = indent
     c = count
-    if len(dev.hostname) < 5: #mint is shortest name
-        color = Fore.RED
-    elif isinstance(dev, AbsentDevice):
-        color = Fore.CYAN
-    elif isinstance(dev, RouterDevice):
-        color = Fore.LIGHTGREEN_EX
-    elif isinstance(dev, MeshDevice):
-        color = Fore.LIGHTYELLOW_EX
+
+    match dev:
+        case RouterDevice():
+            color = Fore.GREEN
+        case MeshDevice():
+            color = Fore.YELLOW
+        case MeshClientDevice():
+            color = Fore.MAGENTA
+        case ExtendedDevice():
+            color = Fore.BLUE
+        case AbsentDevice():
+            color = Fore.CYAN
+        case _ :
+            color = Fore.RED
 
     print(f"{color}{c:03} " + 1*i*" " + f"{dev.type.name[-2:]:{4-1*i}} "\
           f"{dev.macaddress} {dev.ipaddress:16s} {dev.hostname:34} {dev.model:12.12} "\
@@ -85,11 +91,6 @@ def print_topology(dev, sortkey, indent, count, color):
           f"{str(dev.signal_strength):>3.3s}"\
           f"{Style.RESET_ALL}")
     if len(dev.associates) > 0:
-        match dev:
-            case RouterDevice():
-                color = Fore.GREEN
-            case MeshDevice():
-                color = Fore.YELLOW
         i = i + 1
         match sortkey:
             case 'm':
@@ -135,6 +136,10 @@ class ExtendedDevice(Device):
         """ associate dev to this device """
         if dev not in self.associates:
             self.associates.append(dev)
+    def disassociate(self, dev):
+        """ disassociate dev from this device """
+        if dev in self.associates:
+            self.associates.remove(dev)
     def set_device_type(self, devtype):
         if devtype == "other" or devtype == "iot_device":
             return
@@ -153,6 +158,12 @@ class MeshDevice(ExtendedDevice):
     def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
         super().__init__(type, macaddr, ipaddr, hostname)
         self.client_num = 0
+
+@dataclass
+class MeshClientDevice(ExtendedDevice):
+    """ Class RouterDevice """
+    def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
+        super().__init__(type, macaddr, ipaddr, hostname)
 
 @dataclass
 class AbsentDevice(ExtendedDevice):
@@ -229,7 +240,6 @@ def main(router_host, username, password, sortkey, log_level):
     router_dev.device_type = "Router"
     logger.info(f"From status, added RouterDevice {router_dev}")
     
-
     logger.debug(devices)
 
     for dev in status.devices:
@@ -246,18 +256,51 @@ def main(router_host, username, password, sortkey, log_level):
         mac = item['mac']
         try:
             old_dev = devices[macaddress.EUI48(mac)]
-            dev = devices[macaddress.EUI48(mac)] = MeshDevice(dev.type, dev._macaddr, dev._ipaddr, dev.hostname)
+            mesh_dev = devices[macaddress.EUI48(mac)] = MeshDevice(dev.type, dev._macaddr, dev._ipaddr, dev.hostname)
             logger.info(f"From mesh devices, changing {old_dev} to MeshDevice {devices[dev.macaddress]}")
         except KeyError as ex:
-            dev = devices[dev.macaddress] = MeshDevice(Connection.HOST_5G, macaddress.EUI48(mac), ipaddress.ip_address(item['ip']), item['name'])
-            dev.model = item['model']
-            logger.info(f"From mesh devices, added {devices[dev.macaddress]}")
-            mesh_sclient_detail = router.request(f"admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac={item['mac']}", 'operation=read')
+            mesh_dev = devices[macaddress.EUI48(mac)] = MeshDevice(Connection.HOST_5G, macaddress.EUI48(mac), ipaddress.ip_address(item['ip']), item['name'])
+            mesh_dev.model = item['model']
+            logger.info(f"From mesh devices, added {devices[mesh_dev.macaddress]}")
+            mesh_sclient_detail = router.request(f"admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac={mac}", 'operation=read')
             logger.debug(mesh_sclient_detail)
-        dev.client_num = item['client_num']
-        dev.device_type = item['device_type']
-        dev.signal_strength = item['signal_strength']
-        router_dev.associate(dev)
+            mesh_clients = mesh_sclient_detail.get('mesh_nclient_list', [])
+            for mesh_client in mesh_clients:
+                mac_client = mesh_client['mac']
+                try:
+                    old_client_dev = devices[macaddress.EUI48(mac_client)]
+                    match mesh_client['connection_type']:
+                            case '2.4G':
+                                connection_type = Connection.HOST_2G
+                            case '5G':
+                                connection_type = Connection.HOST_5G
+                            case '6G':
+                                connection_type = Connection.HOST_6G
+                            case _ :
+                                connection_type = Connection.HOST_2G
+                                logger.debug('Assuming Connection.HOST_2G')
+                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(connection_type, macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
+                except KeyError as ex:
+                    match mesh_client['connection_type']:
+                        case '2.4G':
+                            connection_type = Connection.HOST_2G
+                        case '5G':
+                            connection_type = Connection.HOST_5G
+                        case '6G':
+                            connection_type = Connection.HOST_6G
+                        case _ :
+                            connection_type = Connection.HOST_2G
+                            logger.debug('Assuming Connection.HOST_2G')
+                    mesh_client_dev = devices[macaddress.EUI48(mac_client)] = MeshClientDevice(connection_type, macaddress.EUI48(mac_client), ipaddress.ip_address(mesh_client['ip']), mesh_client['name'])
+                    mesh_client_dev.signal_strength = mesh_client['signal_strength']
+                    logger.info(f"From mesh sclient detail, added {devices[mesh_client_dev.macaddress]}")
+                mesh_dev.associate(mesh_client_dev)
+                router_dev.disassociate(old_client_dev)
+                logger.info(f"From mesh sclient detail, disassociated {devices[mesh_client_dev.macaddress]} from {router_dev}")
+        mesh_dev.client_num = item['client_num']
+        mesh_dev.device_type = item['device_type']
+        mesh_dev.signal_strength = item['signal_strength']
+        router_dev.associate(mesh_dev)
     
     logger.info("getting dhcp leases")
     ipv4_leases = router.get_ipv4_dhcp_leases()
@@ -286,8 +329,8 @@ def main(router_host, username, password, sortkey, log_level):
         except KeyError as ex:
             dev = devices[dev.macaddress] = ExtendedDevice(Connection.HOST_2G, res.macaddress, res.ipaddress, res.hostname)
             logger.debug(f"From reservations, added {devices[dev.macaddress]}")
+            router_dev.associate(devices[dev.macaddress])
         dev.lease_time = "Permanent"            
-        router_dev.associate(devices[dev.macaddress])
 
     # Get signal strengths and other info
     logger.info("getting device signal strenghts and other info")
