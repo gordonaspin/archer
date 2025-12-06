@@ -67,7 +67,7 @@ def setup_logger(log_level) -> None:
     
     return level
 
-def print_topology(dev, indent, count, color):
+def print_topology(dev, sortkey, indent, count, color):
     i = indent
     c = count
     if len(dev.hostname) < 5: #mint is shortest name
@@ -91,9 +91,27 @@ def print_topology(dev, indent, count, color):
             case MeshDevice():
                 color = Fore.YELLOW
         i = i + 1
-        dev.associates.sort(key=lambda a:a.ipaddress)
+        match sortkey:
+            case 'm':
+                dev.associates.sort(key=lambda a:a.macaddress)
+            case 'i':
+                dev.associates.sort(key=lambda a:a.ipaddress)
+            case 'h':
+                dev.associates.sort(key=lambda a:a.hostname)
+            case 'o':
+                dev.associates.sort(key=lambda a:a.model)
+            case 'v':
+                dev.associates.sort(key=lambda a:a.vendor)
+            case 'l':
+                dev.associates.sort(key=lambda a:a.lease_time)
+            case 't':
+                dev.associates.sort(key=lambda a:a.device_type)
+            case 's':
+                dev.associates.sort(key=lambda a:a.signal_strength)
+            case _ :
+                dev.associates.sort(key=lambda a:a.ipaddress)
         for dev in dev.associates:
-            c = print_topology(dev, i, c + 1, color)
+            c = print_topology(dev, sortkey, i, c + 1, color)
 
     return c
 
@@ -157,13 +175,14 @@ def map_connection_type(type):
 @click.option("--router-host",       help="URL of router", default="http://192.168.0.1")
 @click.option("--username",     help="username", default="admin")
 @click.option("--password",     help="password")
+@click.option("--sortkey",     help="m=MAC, i=IP, h=Hostname, o=Model, v=Vendor, l=Lease, t=Type, s=dB", default="i")
 @click.option("--log-level",
               help="Log level (default: none)",
               type=click.Choice(["none", "debug", "info", "error"]),
               default="none")
 
 
-def main(router_host, username, password, log_level):
+def main(router_host, username, password, sortkey, log_level):
     """ main entry point"""
     level = setup_logger(log_level)
     #maclookup.update_vendors()
@@ -306,7 +325,7 @@ def main(router_host, username, password, log_level):
             "Lease     Type              dB"\
             f"{Style.RESET_ALL}")
 
-    print_topology(router_dev, 0, 1, Fore.GREEN)
+    print_topology(router_dev, sortkey, 0, 1, Fore.GREEN)
 
 if __name__ == '__main__':
     main() #pylint: disable=no-value-for-parameter
