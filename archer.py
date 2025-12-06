@@ -240,9 +240,7 @@ def main(router_host, username, password, sortkey, log_level):
     logger.debug(devices)
 
     logger.info("getting mesh devices")
-    mesh_devices = router.request(
-        'admin/easymesh_network?form=mesh_sclient_list_all&operation=read',
-        'operation=read')
+    mesh_devices = router.request('admin/easymesh_network?form=mesh_sclient_list_all&operation=read', 'operation=read')
     logger.debug(mesh_devices)
     for item in mesh_devices:
         mac = item['mac']
@@ -254,6 +252,8 @@ def main(router_host, username, password, sortkey, log_level):
             dev = devices[dev.macaddress] = MeshDevice(Connection.HOST_5G, macaddress.EUI48(mac), ipaddress.ip_address(item['ip']), item['name'])
             dev.model = item['model']
             logger.info(f"From mesh devices, added {devices[dev.macaddress]}")
+            mesh_sclient_detail = router.request(f"admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac={item['mac']}", 'operation=read')
+            logger.debug(mesh_sclient_detail)
         dev.client_num = item['client_num']
         dev.device_type = item['device_type']
         dev.signal_strength = item['signal_strength']
